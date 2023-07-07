@@ -1,0 +1,4 @@
+#gameCanvas {
+    width: 100%;
+    height: 90vh; /* Esto ajustará el canvas al 100% de la altura de la ventana */
+  }
