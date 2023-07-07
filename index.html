@@ -29,36 +29,73 @@
 
         const player = {
             x: 50,
-            y: canvas.height - 150, // Ajusta la posición inicial en el eje y para que no queden arriba del todo
+            y: canvas.height - 100,
             width: 50,
             height: 50,
             speed: 5,
-            jumpForce: 15, // Fuerza del salto
-            isJumping: false,
-            jumpCount: 0,
+            jumping: false,
+            jumpHeight: 10,
+            yVelocity: 0,
+            gravity: 0.5,
+            health: 100,
             killCount: 0
         };
 
         const bullets = [];
+        const enemies = [];
 
-        const enemies = [
-            { x: 200, y: canvas.height - 100, width: 50, height: 50, speed: 3, alive: true },
-            { x: 400, y: canvas.height - 100, width: 50, height: 50, speed: 3, alive: true },
-            { x: 600, y: canvas.height - 100, width: 50, height: 50, speed: 3, alive: true }
-        ];
+        function spawnEnemy() {
+    const enemy = {
+        x: canvas.width,
+        y: player.y - -10, // Nivelar la altura de los enemigos con la del jugador
+        width: 50,
+        height: 50,
+        speed: 3,
+        health: 100,
+        alive: true
+    };
+    enemies.push(enemy);
+}
+
+function startEnemySpawning() {
+    setInterval(spawnEnemy, 2000); // Genera un nuevo enemigo cada 2 segundos
+}
+
+startEnemySpawning();
+
+        function randomShoot(enemy) {
+            bullets.push({
+                x: enemy.x,
+                y: enemy.y + enemy.height / 2,
+                width: 10,
+                height: 5,
+                speed: 5,
+                active: true,
+                isEnemyBullet: true
+            });
+        }
 
         document.addEventListener("keydown", function(event) {
-            if (event.key === "ArrowLeft") {
+            if (event.key === "a") {
                 player.x -= player.speed;
-            } else if (event.key === "ArrowRight") {
+            } else if (event.key === "d") {
                 player.x += player.speed;
-            } else if (event.key === " ") {
-                if (!player.isJumping) { // Evitar saltar mientras ya está en el aire
-                    player.isJumping = true;
-                    player.jumpCount = player.jumpForce;
-                }
+            } else if (event.key === "f") {
+                bullets.push({
+                    x: player.x + player.width,
+                    y: player.y + player.height / 2,
+                    width: 10,
+                    height: 5,
+                    speed: 7,
+                    active: true,
+                    isEnemyBullet: false
+                });
+            } else if (event.key === "w" && !player.jumping) {
+                player.jumping = true;
+                player.yVelocity = -player.jumpHeight;
             }
         });
+
 
         function drawBackground() {
             ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
@@ -66,6 +103,10 @@
 
         function drawPlayer() {
             ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+
+            // Barra de vida del jugador
+            ctx.fillStyle = "green";
+            ctx.fillRect(player.x, player.y - 10, player.health * 0.5, 5);
         }
 
         function drawBullets() {
@@ -80,48 +121,63 @@
             enemies.forEach(function(enemy) {
                 if (enemy.alive) {
                     ctx.drawImage(enemyImage, enemy.x, enemy.y, enemy.width, enemy.height);
+                    // Barra de vida del enemigo
+                    ctx.fillStyle = "green";
+                    ctx.fillRect(enemy.x, enemy.y - 10, enemy.health * 0.5, 5);
                 }
             });
         }
 
         function updatePlayer() {
-            if (player.isJumping) {
-                player.y -= player.jumpCount;
-                player.jumpCount--;
+            player.yVelocity += player.gravity;
+            player.y += player.yVelocity;
 
-                if (player.jumpCount === 0) {
-                    player.isJumping = false;
-                }
-            }
-
-            if (player.y < canvas.height - player.height) {
-                player.y += player.speed;
+            if (player.y > canvas.height - player.height) {
+                player.y = canvas.height - player.height;
+                player.yVelocity = 0;
+                player.jumping = false;
             }
         }
 
         function updateBullets() {
             bullets.forEach(function(bullet, bulletIndex) {
                 if (bullet.active) {
-                    bullet.x += bullet.speed;
+                    bullet.x += bullet.speed * (bullet.isEnemyBullet ? -1 : 1);
 
-                    if (bullet.x > canvas.width) {
+                    if (bullet.x > canvas.width || bullet.x < 0) {
                         bullet.active = false;
                     }
 
-                    enemies.forEach(function(enemy, enemyIndex) {
+                    if (!bullet.isEnemyBullet) {
+                        enemies.forEach(function(enemy, enemyIndex) {
+                            if (
+                                bullet.x < enemy.x + enemy.width &&
+                                bullet.x + bullet.width > enemy.x &&
+                                bullet.y < enemy.y + enemy.height &&
+                                bullet.y + bullet.height > enemy.y
+                            ) {
+                                bullet.active = false;
+                                enemy.health -= 10;
+                                if (enemy.health <= 0) {
+                                    enemy.alive = false;
+                                    player.killCount++;
+                                }
+                            }
+                        });
+                    } else {
                         if (
-                            bullet.x < enemy.x + enemy.width &&
-                            bullet.x + bullet.width > enemy.x &&
-                            bullet.y < enemy.y + enemy.height &&
-                            bullet.y + bullet.height > enemy.y
+                            bullet.x < player.x + player.width &&
+                            bullet.x + bullet.width > player.x &&
+                            bullet.y < player.y + player.height &&
+                            bullet.y + bullet.height > player.y
                         ) {
                             bullet.active = false;
-                            enemy.alive = false;
-                            player.killCount++;
-                            player.width += 5;
-                            player.height += 5;
+                            player.health -= 10;
+                            if (player.health <= 0) {
+                                gameOver();
+                            }
                         }
-                    });
+                    }
                 }
             });
 
@@ -140,6 +196,23 @@
             });
         }
 
+        function updateEnemies() {
+            enemies.forEach(function(enemy) {
+                if (enemy.alive) {
+                    if (enemy.x > player.x) {
+                        enemy.x -= enemy.speed;
+                    } else {
+                        enemy.x += enemy.speed;
+                    }
+
+                    // Disparar aleatoriamente
+                    if (Math.random() < 0.02) {
+                        randomShoot(enemy);
+                    }
+                }
+            });
+        }
+
         function gameLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -147,15 +220,33 @@
             drawPlayer();
             drawBullets();
             drawEnemies();
+
             updatePlayer();
             updateBullets();
+            updateEnemies();
 
             requestAnimationFrame(gameLoop);
         }
 
-        Promise.all([backgroundImage.onload, playerImage.onload, enemyImage.onload, bulletImage.onload]).then(function() {
+        function gameOver() {
+            alert("Game Over. ¿Quieresreiniciar el juego?");
+            resetGame();
+        }
+
+        function resetGame() {
+            player.x = 50;
+            player.y = canvas.height - 100;
+            player.health = 100;
+            player.killCount = 0;
+            bullets.length = 0;
+            enemies.length = 0;
             gameLoop();
-        });
+        }
+
+        Promise.all([backgroundImage.onload, playerImage.onload, enemyImage.onload, bulletImage.onload]).then(function() {
+    console.log("Todas las imágenes se han cargado correctamente.");
+    gameLoop();
+});
     </script>
 </body>
 </html>
