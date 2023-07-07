@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Metal Slug-like Game</title>
+    <style>
+        #gameCanvas {
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const backgroundImage = new Image();
+        backgroundImage.src = "img/fondo.png"; // Ruta de tu imagen de fondo
+
+        const playerImage = new Image();
+        playerImage.src = "img/milei.jpeg";  // Ruta de la imagen del protagonista
+
+        const enemyImage = new Image();
+        enemyImage.src = "img/cris.jpg"; // Ruta de la imagen de los enemigos
+
+        const bulletImage = new Image();
+        bulletImage.src = "img/bullet.png"; // Ruta de la imagen de los disparos
+
+        const player = {
+            x: 50,
+            y: canvas.height - 150, // Ajusta la posición inicial en el eje y para que no queden arriba del todo
+            width: 50,
+            height: 50,
+            speed: 5,
+            jumpForce: 15, // Fuerza del salto
+            isJumping: false,
+            jumpCount: 0,
+            killCount: 0
+        };
+
+        const bullets = [];
+
+        const enemies = [
+            { x: 200, y: canvas.height - 100, width: 50, height: 50, speed: 3, alive: true },
+            { x: 400, y: canvas.height - 100, width: 50, height: 50, speed: 3, alive: true },
+            { x: 600, y: canvas.height - 100, width: 50, height: 50, speed: 3, alive: true }
+        ];
+
+        document.addEventListener("keydown", function(event) {
+            if (event.key === "ArrowLeft") {
+                player.x -= player.speed;
+            } else if (event.key === "ArrowRight") {
+                player.x += player.speed;
+            } else if (event.key === " ") {
+                if (!player.isJumping) { // Evitar saltar mientras ya está en el aire
+                    player.isJumping = true;
+                    player.jumpCount = player.jumpForce;
+                }
+            }
+        });
+
+        function drawBackground() {
+            ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+        }
+
+        function drawPlayer() {
+            ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+        }
+
+        function drawBullets() {
+            bullets.forEach(function(bullet) {
+                if (bullet.active) {
+                    ctx.drawImage(bulletImage, bullet.x, bullet.y, bullet.width, bullet.height);
+                }
+            });
+        }
+
+        function drawEnemies() {
+            enemies.forEach(function(enemy) {
+                if (enemy.alive) {
+                    ctx.drawImage(enemyImage, enemy.x, enemy.y, enemy.width, enemy.height);
+                }
+            });
+        }
+
+        function updatePlayer() {
+            if (player.isJumping) {
+                player.y -= player.jumpCount;
+                player.jumpCount--;
+
+                if (player.jumpCount === 0) {
+                    player.isJumping = false;
+                }
+            }
+
+            if (player.y < canvas.height - player.height) {
+                player.y += player.speed;
+            }
+        }
+
+        function updateBullets() {
+            bullets.forEach(function(bullet, bulletIndex) {
+                if (bullet.active) {
+                    bullet.x += bullet.speed;
+
+                    if (bullet.x > canvas.width) {
+                        bullet.active = false;
+                    }
+
+                    enemies.forEach(function(enemy, enemyIndex) {
+                        if (
+                            bullet.x < enemy.x + enemy.width &&
+                            bullet.x + bullet.width > enemy.x &&
+                            bullet.y < enemy.y + enemy.height &&
+                            bullet.y + bullet.height > enemy.y
+                        ) {
+                            bullet.active = false;
+                            enemy.alive = false;
+                            player.killCount++;
+                            player.width += 5;
+                            player.height += 5;
+                        }
+                    });
+                }
+            });
+
+            // Eliminar los disparos desactivados del array
+            bullets.forEach(function(bullet, index) {
+                if (!bullet.active) {
+                    bullets.splice(index, 1);
+                }
+            });
+
+            // Eliminar los enemigos muertos del array
+            enemies.forEach(function(enemy, index) {
+                if (!enemy.alive) {
+                    enemies.splice(index, 1);
+                }
+            });
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawBackground();
+            drawPlayer();
+            drawBullets();
+            drawEnemies();
+            updatePlayer();
+            updateBullets();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        Promise.all([backgroundImage.onload, playerImage.onload, enemyImage.onload, bulletImage.onload]).then(function() {
+            gameLoop();
+        });
+    </script>
+</body>
+</html>
